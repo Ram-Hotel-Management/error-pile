@@ -1,5 +1,5 @@
 [package]
-name = "ram-error-pile"
+name = "error-pile"
 description = "All errors for projects managed by Ram Hotel Management apps reside in this crate"
 version = "0.1.0"
 edition = "2024"
