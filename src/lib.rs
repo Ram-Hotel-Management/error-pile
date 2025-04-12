@@ -84,9 +84,9 @@ pub enum ErrPile {
 }
 
 impl ErrPile {
-    pub fn custom<I>(msg: I) -> Self
+    pub fn custom<'a, I>(msg: I) -> Self
     where
-        I: Into<Cow<'static, str>>,
+        I: Into<Cow<'a, str>>,
     {
         let s = msg.into().into_owned();
         Self::Custom(s)
@@ -96,6 +96,12 @@ impl ErrPile {
 impl<T> From<ErrPile> for PileResult<T> {
     fn from(value: ErrPile) -> Self {
         Err(value)
+    }
+}
+
+impl From<&str> for ErrPile {
+    fn from(value: &str) -> Self {
+        ErrPile::custom(value)
     }
 }
 
