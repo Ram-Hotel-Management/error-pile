@@ -1,8 +1,7 @@
-use std::borrow::Cow;
-
 use sea_orm::DbErr;
 use serde::Deserialize;
 use serde_json::Value;
+use std::borrow::Cow;
 
 /// Accomdate the use for mapping to correct response
 /// from Microsoft Graph response
@@ -20,17 +19,25 @@ pub struct MSResponseError {
 }
 
 #[derive(Debug, Deserialize)]
-pub enum MSResponse<T> {
-    Ok(T),
-    Err(MSResponseError),
+pub struct MSResponse<T> {
+    value: Option<T>,
+    error: Option<MSResponseError>,
 }
 
-impl<T> From<MSResponse<T>> for PileResult<T> {
+impl<T: std::fmt::Debug> From<MSResponse<T>> for PileResult<T> {
     fn from(value: MSResponse<T>) -> Self {
-        match value {
-            MSResponse::Ok(apivalue) => Ok(apivalue),
-            MSResponse::Err(msresponse_error) => Err(ErrPile::Response(msresponse_error)),
+        if let Some(err) = value.error {
+            return Err(ErrPile::Response(err));
         }
+
+        if let Some(val) = value.value {
+            return Ok(val);
+        }
+
+        Err(ErrPile::Custom(format!(
+            "Could not parse Ok variant or the Err variant | Response: {:?}",
+            value
+        )))
     }
 }
 
@@ -76,7 +83,9 @@ pub enum ErrPile {
     #[error("A thread panicked while executing a task")]
     Thread(#[from] tokio::task::JoinError),
 
-    #[error("An IO Error Occurred")]
+    // #[error("An ocr client/ server returned an error")]
+    // Ocr(#[from] ocr_client::err::OcrErrs),
+    #[error("IO Err: {0}")]
     IO(#[from] std::io::Error),
 
     #[error("{0}")]
@@ -84,9 +93,9 @@ pub enum ErrPile {
 }
 
 impl ErrPile {
-    pub fn custom<I>(msg: I) -> Self
+    pub fn custom<'a, I>(msg: I) -> Self
     where
-        I: Into<Cow<'static, str>>,
+        I: Into<Cow<'a, str>>,
     {
         let s = msg.into().into_owned();
         Self::Custom(s)
@@ -96,6 +105,12 @@ impl ErrPile {
 impl<T> From<ErrPile> for PileResult<T> {
     fn from(value: ErrPile) -> Self {
         Err(value)
+    }
+}
+
+impl From<&str> for ErrPile {
+    fn from(value: &str) -> Self {
+        ErrPile::custom(value)
     }
 }
 
