@@ -83,8 +83,12 @@ pub enum ErrPile {
     #[error("A thread panicked while executing a task")]
     Thread(#[from] tokio::task::JoinError),
 
-    // #[error("An ocr client/ server returned an error")]
-    // Ocr(#[from] ocr_client::err::OcrErrs),
+    #[error("An ocr client/ server returned an error")]
+    Ocr(#[from] ocr_client::err::OcrErrs),
+
+    #[error("A TimeFrame error occurred")]
+    Timeframe(#[from] timeframe::TimeErr),
+
     #[error("IO Err: {0}")]
     IO(#[from] std::io::Error),
 
