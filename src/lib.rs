@@ -83,7 +83,7 @@ pub enum ErrPile {
     Thread(#[from] tokio::task::JoinError),
 
     #[error("An ocr client/ server returned an error")]
-    Ocr(#[from] ocr_client::err::OcrErrs),
+    Ocr(#[from] ocr_client::OcrErrs),
 
     #[error("A TimeFrame error occurred")]
     Timeframe(#[from] timeframe::TimeErr),
