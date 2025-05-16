@@ -71,9 +71,8 @@ pub enum ErrPile {
     #[error("Request responded with an error")]
     Response(MSResponseError),
 
-    #[error("An error occurred with excel file")]
-    Xlsx(#[from] calamine::XlsxError),
-
+    // #[error("An error occurred with excel file")]
+    // Xlsx(#[from] calamine::XlsxError),
     #[error("Error opening zip archive")]
     Zip(#[from] zip::result::ZipError),
 
