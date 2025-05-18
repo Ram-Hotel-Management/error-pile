@@ -201,12 +201,13 @@ pub enum ErrPile {
         tokio::task::JoinError,
     ),
 
-    // #[error("An ocr client/ server returned an error")]
-    // Ocr(
-    //     #[source]
-    //     #[from]
-    //     ocr_client::OcrErrs,
-    // ),
+    #[error("An error occurred while performing an operation on a Image")]
+    Image(
+        #[source]
+        #[from]
+        image::ImageError,
+    ),
+
     #[error("A TimeFrame error occurred")]
     Timeframe(
         #[source]

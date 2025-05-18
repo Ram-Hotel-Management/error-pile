@@ -1188,6 +1188,7 @@ dependencies = [
  "chrono",
  "graph-http",
  "graph-rs-sdk",
+ "image",
  "pdfium-render",
  "pyo3",
  "reqwest",
