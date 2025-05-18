@@ -120,7 +120,7 @@ pub struct AZWarnning {
 /////////////////////////////// END OF AZURE Document Intelligence Errors ////////////////////////
 
 /// Short hand Result
-pub type PileResult<T> = Result<T, ErrPile>;
+pub type PileResult<T = ()> = Result<T, ErrPile>;
 
 /// Encapsulates all the possible Error that might be encountered
 #[derive(Debug, thiserror::Error)]
@@ -219,6 +219,13 @@ pub enum ErrPile {
         #[source]
         #[from]
         std::io::Error,
+    ),
+
+    #[error("An error occurred on Python Side: {0}")]
+    Python(
+        #[from]
+        #[source]
+        pyo3::PyErr,
     ),
 
     #[error("An error occurred while parsing the URL")]
