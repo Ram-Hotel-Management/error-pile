@@ -5,6 +5,7 @@ use std::{borrow::Cow, error::Error, fmt};
 
 /// Accomdate the use for mapping to correct response
 /// from Microsoft Graph response
+/// TODO implement ERROR trait this struct
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MSResponseErrorInner {
