@@ -221,13 +221,12 @@ pub enum ErrPile {
         std::io::Error,
     ),
 
-    #[error("An error occurred on Python Side: {0}")]
-    Python(
-        #[from]
-        #[source]
-        pyo3::PyErr,
-    ),
-
+    // #[error("An error occurred on Python Side: {0}")]
+    // Python(
+    //     #[from]
+    //     #[source]
+    //     pyo3::PyErr,
+    // ),
     #[error("An error occurred while parsing the URL")]
     Url(
         #[source]
