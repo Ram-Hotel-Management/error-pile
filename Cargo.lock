@@ -1189,6 +1189,8 @@ dependencies = [
  "graph-http",
  "graph-rs-sdk",
  "ocr-client",
+ "pdfium-render",
+ "reqwest",
  "russh",
  "russh-sftp",
  "sea-orm",
@@ -1198,6 +1200,7 @@ dependencies = [
  "thiserror 2.0.12",
  "timeframe",
  "tokio",
+ "url",
  "uuid",
  "zip",
 ]

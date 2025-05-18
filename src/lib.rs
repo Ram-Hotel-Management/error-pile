@@ -1,7 +1,7 @@
 use sea_orm::DbErr;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::borrow::Cow;
+use std::{borrow::Cow, error::Error, fmt};
 
 /// Accomdate the use for mapping to correct response
 /// from Microsoft Graph response
@@ -27,7 +27,7 @@ pub struct MSResponse<T> {
 impl<T: std::fmt::Debug> From<MSResponse<T>> for PileResult<T> {
     fn from(value: MSResponse<T>) -> Self {
         if let Some(err) = value.error {
-            return Err(ErrPile::Response(err));
+            return Err(ErrPile::MS(err));
         }
 
         if let Some(val) = value.value {
@@ -41,6 +41,83 @@ impl<T: std::fmt::Debug> From<MSResponse<T>> for PileResult<T> {
     }
 }
 
+/////////////////////////////// AZURE Document Intelligence Errors ////////////////////////
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AZError {
+    pub error: AZErrorDetails,
+}
+
+impl fmt::Display for AZError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.error.fmt(f)
+    }
+}
+
+impl std::error::Error for AZError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error as &dyn Error)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AZErrorDetails {
+    pub code: String,
+    pub message: String,
+    pub target: Option<String>,
+    pub details: Option<Vec<AZError>>,
+    pub innererror: Option<AZErrorInner>,
+}
+
+impl fmt::Display for AZErrorDetails {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} - {}", self.code, self.message,)
+    }
+}
+
+impl std::error::Error for AZErrorDetails {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.innererror.as_ref().map(|e| e as &dyn Error)
+    }
+}
+
+type BoxAZErrorInner = Box<AZErrorInner>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AZErrorInner {
+    pub code: Option<String>,
+    pub message: Option<String>,
+    pub innererror: Option<BoxAZErrorInner>,
+}
+
+impl fmt::Display for AZErrorInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} - {}",
+            self.code.as_ref().map_or("", |v| v),
+            self.message.as_ref().map_or("", |v| v)
+        )
+    }
+}
+
+impl std::error::Error for AZErrorInner {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.innererror.as_deref().map(|e| e as &dyn Error)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AZWarnning {
+    /** One of a server-defined set of warning codes. */
+    code: String,
+    /** A human-readable representation of the warning. */
+    message: String,
+    /** The target of the error. */
+    target: Option<String>,
+}
+
+/////////////////////////////// END OF AZURE Document Intelligence Errors ////////////////////////
+
 /// Short hand Result
 pub type PileResult<T> = Result<T, ErrPile>;
 
@@ -48,48 +125,129 @@ pub type PileResult<T> = Result<T, ErrPile>;
 #[derive(Debug, thiserror::Error)]
 pub enum ErrPile {
     #[error("Error connecting/ storing to DB")]
-    DB(#[from] DbErr),
+    DB(
+        #[source]
+        #[from]
+        DbErr,
+    ),
 
     #[error("An error occurred with SSH")]
-    Ssh(#[from] russh::Error),
+    Ssh(
+        #[source]
+        #[from]
+        russh::Error,
+    ),
 
     #[error("An error occurred with sftp connection")]
-    Sftp(#[from] russh_sftp::client::error::Error),
+    Sftp(
+        #[source]
+        #[from]
+        russh_sftp::client::error::Error,
+    ),
 
     #[error("An invalid username or password was provided. Please try again")]
     Auth,
 
     #[error("An error occurred while getting data using Microsoft Graph")]
-    Graph(#[from] graph_rs_sdk::GraphFailure),
+    Graph(
+        #[source]
+        #[from]
+        graph_rs_sdk::GraphFailure,
+    ),
 
     #[error("Graph Error Message")]
-    GraphErrMSg(#[from] graph_rs_sdk::error::ErrorMessage),
+    GraphErrMSg(
+        #[source]
+        #[from]
+        graph_rs_sdk::error::ErrorMessage,
+    ),
 
     #[error("Error parsing Json Data (Serde)")]
-    Json(#[from] serde_json::Error),
+    Json(
+        #[source]
+        #[from]
+        serde_json::Error,
+    ),
 
     #[error("Request responded with an error")]
-    Response(MSResponseError),
+    MS(MSResponseError),
 
-    // #[error("An error occurred with excel file")]
-    // Xlsx(#[from] calamine::XlsxError),
+    #[error("An error occurred while parsing the PDF text (PDF_Extract)")]
+    ExtractPdf(
+        #[source]
+        #[from]
+        pdfium_render::prelude::PdfiumError,
+    ),
+
     #[error("Error opening zip archive")]
-    Zip(#[from] zip::result::ZipError),
+    Zip(
+        #[source]
+        #[from]
+        zip::result::ZipError,
+    ),
 
     #[error("Error decoding from base64 content bytes")]
-    Decode(#[from] base64::DecodeError),
+    Decode(
+        #[source]
+        #[from]
+        base64::DecodeError,
+    ),
 
     #[error("A thread panicked while executing a task")]
-    Thread(#[from] tokio::task::JoinError),
+    Thread(
+        #[source]
+        #[from]
+        tokio::task::JoinError,
+    ),
 
     #[error("An ocr client/ server returned an error")]
-    Ocr(#[from] ocr_client::OcrErrs),
+    Ocr(
+        #[source]
+        #[from]
+        ocr_client::OcrErrs,
+    ),
 
     #[error("A TimeFrame error occurred")]
-    Timeframe(#[from] timeframe::TimeErr),
+    Timeframe(
+        #[source]
+        #[from]
+        timeframe::TimeErr,
+    ),
 
     #[error("IO Err: {0}")]
-    IO(#[from] std::io::Error),
+    IO(
+        #[source]
+        #[from]
+        std::io::Error,
+    ),
+
+    #[error("An error occurred while parsing the URL")]
+    Url(
+        #[source]
+        #[from]
+        url::ParseError,
+    ),
+
+    #[error("An error occurred while sending request to the AI Model")]
+    Req(
+        #[source]
+        #[from]
+        reqwest::Error,
+    ),
+
+    #[error("An error occurred while converting Http Header to string")]
+    ReqToStr(
+        #[source]
+        #[from]
+        reqwest::header::ToStrError,
+    ),
+
+    #[error("Document Intelligence Services returned with an error")]
+    AZ(
+        #[source]
+        #[from]
+        AZError,
+    ),
 
     #[error("{0}")]
     Custom(String),
