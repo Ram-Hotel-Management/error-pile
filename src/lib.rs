@@ -222,12 +222,14 @@ pub enum ErrPile {
         std::io::Error,
     ),
 
+    #[cfg(feature = "python")]
     #[error("An error occurred on Python Side: {0}")]
     Python(
         #[from]
         #[source]
         pyo3::PyErr,
     ),
+
     #[error("An error occurred while parsing the URL")]
     Url(
         #[source]
@@ -267,6 +269,11 @@ impl ErrPile {
     {
         let s = msg.into().into_owned();
         Self::Custom(s)
+    }
+
+    /// the error is related to invalid credentials
+    pub fn is_encrypted(&self) -> bool {
+        matches!(self, Self::Auth)
     }
 }
 
