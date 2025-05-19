@@ -1,7 +1,7 @@
 use sea_orm::DbErr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{borrow::Cow, error::Error, fmt};
+use std::{borrow::Cow, error::Error, fmt, io::ErrorKind};
 
 /// Accomdate the use for mapping to correct response
 /// from Microsoft Graph response
@@ -274,6 +274,39 @@ impl ErrPile {
     /// the error is related to invalid credentials
     pub fn is_encrypted(&self) -> bool {
         matches!(self, Self::Auth)
+    }
+
+    /// checks if this error is transcient error
+    /// meaning can this error automatically fixed, if the program tries
+    /// again. This will be useful when using retry functions with backoff
+    /// feature.
+    pub fn is_transient(&self) -> bool {
+        if let Self::Req(req) = &self {
+            if let Some(status) = req.status() {
+                return matches!(status.as_u16(), 408 | 429 | 500 | 502 | 503 | 504);
+            }
+        }
+
+        if let Self::IO(io) = &self {
+            return matches!(
+                io.kind(),
+                ErrorKind::WouldBlock
+                    | ErrorKind::TimedOut
+                    | ErrorKind::Interrupted
+                    | ErrorKind::ConnectionReset
+                    | ErrorKind::ConnectionAborted
+                    | ErrorKind::NotConnected
+                    | ErrorKind::ConnectionRefused
+                    | ErrorKind::AddrInUse
+                    | ErrorKind::Deadlock
+                    | ErrorKind::HostUnreachable
+                    | ErrorKind::NetworkDown
+                    | ErrorKind::NetworkUnreachable
+                    | ErrorKind::ResourceBusy
+            );
+        }
+
+        false
     }
 }
 
