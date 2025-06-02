@@ -1,4 +1,3 @@
-use sea_orm::DbErr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{borrow::Cow, error::Error, fmt, io::ErrorKind};
@@ -129,7 +128,7 @@ pub enum ErrPile {
     DB(
         #[source]
         #[from]
-        DbErr,
+        sqlx::Error,
     ),
 
     #[error("An error occurred with SSH")]
@@ -288,25 +287,39 @@ impl ErrPile {
         }
 
         if let Self::IO(io) = &self {
-            return matches!(
-                io.kind(),
-                ErrorKind::WouldBlock
-                    | ErrorKind::TimedOut
-                    | ErrorKind::Interrupted
-                    | ErrorKind::ConnectionReset
-                    | ErrorKind::ConnectionAborted
-                    | ErrorKind::NotConnected
-                    | ErrorKind::ConnectionRefused
-                    | ErrorKind::AddrInUse
-                    | ErrorKind::Deadlock
-                    | ErrorKind::HostUnreachable
-                    | ErrorKind::NetworkDown
-                    | ErrorKind::NetworkUnreachable
-                    | ErrorKind::ResourceBusy
-            );
+            return Self::is_io_transient(io.kind());
+        }
+
+        if let Self::DB(db) = self {
+            return match db {
+                sqlx::Error::Io(err) if Self::is_io_transient(err.kind()) => true,
+                sqlx::Error::Database(_) => true, // Database errors can be transient
+                sqlx::Error::PoolTimedOut => true,
+                sqlx::Error::PoolClosed => true,
+                _ => false,
+            };
         }
 
         false
+    }
+
+    fn is_io_transient(kind: std::io::ErrorKind) -> bool {
+        matches!(
+            kind,
+            ErrorKind::WouldBlock
+                | ErrorKind::TimedOut
+                | ErrorKind::Interrupted
+                | ErrorKind::ConnectionReset
+                | ErrorKind::ConnectionAborted
+                | ErrorKind::NotConnected
+                | ErrorKind::ConnectionRefused
+                | ErrorKind::AddrInUse
+                | ErrorKind::Deadlock
+                | ErrorKind::HostUnreachable
+                | ErrorKind::NetworkDown
+                | ErrorKind::NetworkUnreachable
+                | ErrorKind::ResourceBusy
+        )
     }
 }
 
