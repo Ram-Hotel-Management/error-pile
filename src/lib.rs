@@ -145,8 +145,11 @@ pub enum ErrPile {
         russh_sftp::client::error::Error,
     ),
 
-    #[error("An invalid username or password was provided. Please try again")]
+    #[error("Invalid username or password was provided. Please try again")]
     Auth,
+
+    #[error("User does not have permission to perform this action")]
+    Permission,
 
     #[error("An error occurred while getting data using Microsoft Graph")]
     Graph(
