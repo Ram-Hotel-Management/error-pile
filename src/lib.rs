@@ -148,8 +148,11 @@ pub enum ErrPile {
     #[error("Invalid username or password was provided. Please try again")]
     Auth,
 
-    #[error("User does not have permission to perform this action")]
+    #[error("User does not have permission to perform this action.")]
     Permission,
+
+    #[error("This action can't be performed as it is being currently used elsewhere")]
+    InUse,
 
     #[error("An error occurred while getting data using Microsoft Graph")]
     Graph(
