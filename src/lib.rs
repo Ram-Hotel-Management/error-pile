@@ -5,7 +5,7 @@ use std::{borrow::Cow, error::Error, fmt, io::ErrorKind};
 /// Accomdate the use for mapping to correct response
 /// from Microsoft Graph response
 /// TODO implement ERROR trait this struct
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MSResponseErrorInner {
     pub code: String,
@@ -13,12 +13,12 @@ pub struct MSResponseErrorInner {
     pub message: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MSResponseError {
     pub error: MSResponseErrorInner,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MSResponse<T> {
     value: Option<T>,
     error: Option<MSResponseError>,
@@ -35,8 +35,7 @@ impl<T: std::fmt::Debug> From<MSResponse<T>> for PileResult<T> {
         }
 
         Err(ErrPile::Custom(format!(
-            "Could not parse Ok variant or the Err variant | Response: {:?}",
-            value
+            "Could not parse Ok variant or the Err variant | Response: {value:?}"
         )))
     }
 }
