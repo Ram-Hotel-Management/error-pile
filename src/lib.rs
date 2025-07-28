@@ -280,6 +280,13 @@ impl ErrPile {
         matches!(self, Self::Auth)
     }
 
+    /// get the string version of the source error
+    pub fn source_str(&self) -> String {
+        self.source()
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| self.to_string())
+    }
+
     /// checks if this error is transcient error
     /// meaning can this error automatically fixed, if the program tries
     /// again. This will be useful when using retry functions with backoff
