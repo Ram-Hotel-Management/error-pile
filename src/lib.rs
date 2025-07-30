@@ -27,16 +27,16 @@ pub struct MSResponse<T> {
 impl<T: std::fmt::Debug> From<MSResponse<T>> for PileResult<T> {
     fn from(value: MSResponse<T>) -> Self {
         if let Some(err) = value.error {
-            return Err(ErrPile::MS(err));
+            return Err(Box::new(ErrPile::MS(err)));
         }
 
         if let Some(val) = value.value {
             return Ok(val);
         }
 
-        Err(ErrPile::Custom(format!(
+        Err(Box::new(ErrPile::Custom(format!(
             "Could not parse Ok variant or the Err variant | Response: {value:?}"
-        )))
+        ))))
     }
 }
 
@@ -118,7 +118,7 @@ pub struct AZWarnning {
 /////////////////////////////// END OF AZURE Document Intelligence Errors ////////////////////////
 
 /// Short hand Result
-pub type PileResult<T = ()> = Result<T, ErrPile>;
+pub type PileResult<T = ()> = Result<T, Box<ErrPile>>;
 
 /// Encapsulates all the possible Error that might be encountered
 #[derive(Debug, thiserror::Error)]
@@ -337,7 +337,7 @@ impl ErrPile {
 
 impl<T> From<ErrPile> for PileResult<T> {
     fn from(value: ErrPile) -> Self {
-        Err(value)
+        Err(Box::new(value))
     }
 }
 
