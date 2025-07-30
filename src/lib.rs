@@ -335,11 +335,11 @@ impl ErrPile {
     }
 }
 
-impl From<ErrPile> for Box<ErrPile> {
-    fn from(value: ErrPile) -> Self {
-        Box::new(value)
-    }
-}
+// impl From<ErrPile> for Box<ErrPile> {
+//     fn from(value: ErrPile) -> Self {
+//         Box::new(value)
+//     }
+// }
 
 impl<T> From<ErrPile> for PileResult<T> {
     fn from(value: ErrPile) -> Self {
