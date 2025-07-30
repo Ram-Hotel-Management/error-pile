@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{borrow::Cow, error::Error, fmt, io::ErrorKind};
 
+pub mod size_check;
+
 /// Accomdate the use for mapping to correct response
 /// from Microsoft Graph response
 /// TODO implement ERROR trait this struct
@@ -157,14 +159,14 @@ pub enum ErrPile {
     Graph(
         #[source]
         #[from]
-        graph_rs_sdk::GraphFailure,
+        Box<graph_rs_sdk::GraphFailure>,
     ),
 
     #[error("Graph Error Message")]
     GraphErrMSg(
         #[source]
         #[from]
-        graph_rs_sdk::error::ErrorMessage,
+        Box<graph_rs_sdk::error::ErrorMessage>,
     ),
 
     #[error("Error parsing Json Data (Serde)")]
@@ -259,7 +261,7 @@ pub enum ErrPile {
     AZ(
         #[source]
         #[from]
-        AZError,
+        Box<AZError>,
     ),
 
     #[error("{0}")]
@@ -303,7 +305,7 @@ impl ErrPile {
         }
 
         if let Self::DB(db) = self {
-            return match db {
+            return match &db {
                 sqlx::Error::Io(err) if Self::is_io_transient(err.kind()) => true,
                 sqlx::Error::Database(_) => true, // Database errors can be transient
                 sqlx::Error::PoolTimedOut => true,
