@@ -155,6 +155,9 @@ pub enum ErrPile {
     #[error("This action can't be performed as it is being currently used elsewhere")]
     InUse,
 
+    #[error("The resource is not ready yet, please try again later")]
+    NotReady,
+
     #[error("An error occurred while getting data using Microsoft Graph")]
     Graph(
         #[source]
@@ -263,6 +266,9 @@ pub enum ErrPile {
         #[from]
         Box<AZError>,
     ),
+
+    #[error("{0}")]
+    FromValue(serde_json::Value),
 
     #[error("{0}")]
     Custom(String),

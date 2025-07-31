@@ -28,6 +28,10 @@ fn size_check() {
         "graph_rs_sdk::error::ErrorMessage = {}",
         size_of::<graph_rs_sdk::error::ErrorMessage>()
     );
+    println!(
+        "Boxed graph_rs_sdk::error::ErrorMessage = {}",
+        size_of::<Box<graph_rs_sdk::error::ErrorMessage>>()
+    );
     println!("serde_json::Error = {}", size_of::<serde_json::Error>());
     println!(
         "crate::MSResponseError = {}",
@@ -67,4 +71,6 @@ fn size_check() {
         size_of::<Box<crate::AZError>>()
     );
     println!("String = {}", size_of::<String>());
+
+    println!("Value = {}", size_of::<serde_json::Value>());
 }
