@@ -1,124 +1,11 @@
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{borrow::Cow, error::Error, fmt, io::ErrorKind};
+use std::{borrow::Cow, error::Error, io::ErrorKind};
 
-pub mod size_check;
+mod microsoft;
+pub mod value;
 
-/// Accomdate the use for mapping to correct response
-/// from Microsoft Graph response
-/// TODO implement ERROR trait this struct
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MSResponseErrorInner {
-    pub code: String,
-    pub inner_error: Value,
-    pub message: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MSResponseError {
-    pub error: MSResponseErrorInner,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MSResponse<T> {
-    value: Option<T>,
-    error: Option<MSResponseError>,
-}
-
-impl<T: std::fmt::Debug> From<MSResponse<T>> for PileResult<T> {
-    fn from(value: MSResponse<T>) -> Self {
-        if let Some(err) = value.error {
-            return Err(ErrPile::MS(err));
-        }
-
-        if let Some(val) = value.value {
-            return Ok(val);
-        }
-
-        Err(ErrPile::Custom(format!(
-            "Could not parse Ok variant or the Err variant | Response: {value:?}"
-        )))
-    }
-}
-
-/////////////////////////////// AZURE Document Intelligence Errors ////////////////////////
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AZError {
-    pub error: AZErrorDetails,
-}
-
-impl fmt::Display for AZError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.error.fmt(f)
-    }
-}
-
-impl std::error::Error for AZError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.error as &dyn Error)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AZErrorDetails {
-    pub code: String,
-    pub message: String,
-    pub target: Option<String>,
-    pub details: Option<Vec<AZError>>,
-    pub innererror: Option<AZErrorInner>,
-}
-
-impl fmt::Display for AZErrorDetails {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} - {}", self.code, self.message,)
-    }
-}
-
-impl std::error::Error for AZErrorDetails {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.innererror.as_ref().map(|e| e as &dyn Error)
-    }
-}
-
-type BoxAZErrorInner = Box<AZErrorInner>;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AZErrorInner {
-    pub code: Option<String>,
-    pub message: Option<String>,
-    pub innererror: Option<BoxAZErrorInner>,
-}
-
-impl fmt::Display for AZErrorInner {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} - {}",
-            self.code.as_ref().map_or("", |v| v),
-            self.message.as_ref().map_or("", |v| v)
-        )
-    }
-}
-
-impl std::error::Error for AZErrorInner {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.innererror.as_deref().map(|e| e as &dyn Error)
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AZWarnning {
-    /** One of a server-defined set of warning codes. */
-    code: String,
-    /** A human-readable representation of the warning. */
-    message: String,
-    /** The target of the error. */
-    target: Option<String>,
-}
-
-/////////////////////////////// END OF AZURE Document Intelligence Errors ////////////////////////
-
+pub use microsoft::*;
+pub use value::*;
 /// Short hand Result
 pub type PileResult<T = ()> = Result<T, ErrPile>;
 
@@ -246,7 +133,7 @@ pub enum ErrPile {
         url::ParseError,
     ),
 
-    #[error("An error occurred while sending request to the AI Model")]
+    #[error("An error occurred while sending request")]
     Req(
         #[source]
         #[from]
@@ -268,7 +155,11 @@ pub enum ErrPile {
     ),
 
     #[error("{0}")]
-    FromValue(serde_json::Value),
+    FromValue(
+        #[source]
+        #[from]
+        SerdeValue,
+    ),
 
     #[error("{0}")]
     Custom(String),
@@ -290,9 +181,18 @@ impl ErrPile {
 
     /// get the string version of the source error
     pub fn source_str(&self) -> String {
+        if let Self::FromValue(val) = &self {
+            return val.extract_error_from_json();
+        }
+
         self.source()
             .map(|e| e.to_string())
             .unwrap_or_else(|| self.to_string())
+    }
+
+    /// checks if this error is not ready error
+    pub fn is_not_ready(&self) -> bool {
+        matches!(self, Self::NotReady)
     }
 
     /// checks if this error is transcient error
@@ -341,13 +241,65 @@ impl ErrPile {
                 | ErrorKind::ResourceBusy
         )
     }
+
+    /// Handle all types of HTTP errors comprehensively
+    async fn handle_error_response(response: reqwest::Response) -> ErrPile {
+        let status = response.status();
+        let status_code = status.as_u16();
+
+        // Categorize the error type
+        let error_category = match status_code {
+            // 1xx - Informational (shouldn't be errors, but handle just in case)
+            100..=199 => "Informational",
+            // 3xx - Redirection errors
+            300..=399 => "Redirection",
+            // 4xx - Client errors
+            400 => "Bad Request",
+            401 => "Unauthorized",
+            403 => "Forbidden",
+            404 => "Not Found",
+            408 => "Request Timeout",
+            409 => "Conflict",
+            410 => "Gone",
+            413 => "Payload Too Large",
+            414 => "URI Too Long",
+            415 => "Unsupported Media Type",
+            422 => "Unprocessable Entity",
+            429 => "Too Many Requests",
+            430..=499 => "Client Error",
+            // 5xx - Server errors
+            500 => "Internal Server Error",
+            501 => "Not Implemented",
+            502 => "Bad Gateway",
+            503 => "Service Unavailable",
+            504 => "Gateway Timeout",
+            507 => "Insufficient Storage",
+            508..=599 => "Server Error",
+            _ => "Unknown Error",
+        };
+
+        // Try to get response body
+        match response.json::<Value>().await {
+            Ok(body) => {
+                // First try to parse as structured AZError
+                if let Ok(az_error) = serde_json::from_value::<AZError>(body.clone()) {
+                    return ErrPile::AZ(Box::new(az_error));
+                }
+
+                SerdeValue(body).into()
+            }
+            Err(e) => ErrPile::Custom(format!(
+                "{error_category} ({status_code}): Failed to read error response: {e}"
+            )),
+        }
+    }
 }
 
-// impl From<ErrPile> for Box<ErrPile> {
-//     fn from(value: ErrPile) -> Self {
-//         Box::new(value)
-//     }
-// }
+impl From<serde_json::Value> for ErrPile {
+    fn from(value: serde_json::Value) -> Self {
+        ErrPile::FromValue(SerdeValue(value))
+    }
+}
 
 impl<T> From<ErrPile> for PileResult<T> {
     fn from(value: ErrPile) -> Self {
@@ -361,8 +313,26 @@ impl From<&str> for ErrPile {
     }
 }
 
-#[test]
-fn testing_compilations() {
-    let _a = ErrPile::custom("Some message");
-    let _b = ErrPile::custom(format!("{} Some other error", "ErrCode:"));
+pub trait ReqwestPileResExt {
+    /// converts the reponse into appropriate ErrPile
+    /// this will also take care of Azure Document Intelligence errors
+    /// based on the response
+    #[allow(async_fn_in_trait)]
+    async fn to_pile_result<T>(self) -> PileResult<T>
+    where
+        T: for<'de> serde::Deserialize<'de>;
+}
+
+impl ReqwestPileResExt for reqwest::Response {
+    async fn to_pile_result<T>(self) -> PileResult<T>
+    where
+        T: for<'de> serde::Deserialize<'de>,
+    {
+        let status = self.status();
+        if status.is_success() {
+            return Ok(self.json::<T>().await?);
+        }
+
+        Err(ErrPile::handle_error_response(self).await)
+    }
 }

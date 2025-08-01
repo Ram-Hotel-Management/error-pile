@@ -4,7 +4,7 @@ fn size_check() {
     println!("Size analysis of ErrPile variants:");
     println!(
         "std::mem::size_of::<ErrPile>() = {}",
-        size_of::<crate::ErrPile>()
+        size_of::<error_pile::ErrPile>()
     );
     println!();
 
@@ -35,7 +35,7 @@ fn size_check() {
     println!("serde_json::Error = {}", size_of::<serde_json::Error>());
     println!(
         "crate::MSResponseError = {}",
-        size_of::<crate::MSResponseError>()
+        size_of::<error_pile::MSResponseError>()
     );
     println!(
         "pdfium_render::prelude::PdfiumError = {}",
@@ -65,10 +65,10 @@ fn size_check() {
         "reqwest::header::ToStrError = {}",
         size_of::<reqwest::header::ToStrError>()
     );
-    println!("crate::AZError = {}", size_of::<crate::AZError>());
+    println!("crate::AZError = {}", size_of::<error_pile::AZError>());
     println!(
         "Boxed crate::AZError = {}",
-        size_of::<Box<crate::AZError>>()
+        size_of::<Box<error_pile::AZError>>()
     );
     println!("String = {}", size_of::<String>());
 
