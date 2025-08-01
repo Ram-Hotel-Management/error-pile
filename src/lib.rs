@@ -220,6 +220,10 @@ impl ErrPile {
             };
         }
 
+        if let Self::NotReady = self {
+            return true; // Not ready errors are transient
+        }
+
         false
     }
 
