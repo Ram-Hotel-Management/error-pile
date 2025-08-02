@@ -55,7 +55,6 @@ fn size_check() {
         "Box<image::ImageError> = {}",
         size_of::<Box<image::ImageError>>()
     );
-    println!("timeframe::TimeErr = {}", size_of::<timeframe::TimeErr>());
     println!("std::io::Error = {}", size_of::<std::io::Error>());
     #[cfg(feature = "python")]
     println!("pyo3::PyErr = {}", size_of::<pyo3::PyErr>());
